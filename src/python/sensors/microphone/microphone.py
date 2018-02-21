@@ -9,44 +9,62 @@ from shared import create_zmq_server, MessageQueue
 import sys
 import datetime
 from threading import Thread, Event
+import wave
 
+if len(sys.argv) < 2 or len(sys.argv) > 3:
+    exit('Please provide one or two micrphones')
+if len(sys.argv) >= 2:
+    device_indexes = [int(sys.argv[1])]
+    zmq_socket_1, zmq_server_addr_1 = create_zmq_server()
+if len(sys.argv) == 3:
+    device_indexes.index(int(sys.argv[2]))
+    zmq_socket_2, zmq_server_addr_2 = create_zmq_server(s)
 
 FORMAT = pyaudio.paInt16
-CHANNELS = 1
-RATE = 44100
-CHUNK = 2000
+CHANNELS = 2
+RATE = 48000
+CHUNK = 1440
 
-zmq_socket, zmq_server_addr = create_zmq_server()
 
 
 mq = MessageQueue('microphone-sensor')
 p = pyaudio.PyAudio()
+device_names = []
+for i in range(p.get_device_count()):
+    device = p.get_device_info_by_index(i)
+    print(i,device['name'])
+    if i in device_indexes:
+        device_names.append(device['name'])
 
 
-class MyThread(Thread):
-    def __init__(self, mq, zmq_server_addr):
-        Thread.__init__(self)
-        self.stopped = Event()
-        self.mq = mq
-        self.zmq_server_addr = zmq_server_addr
+mq.publish(
+    exchange='sensors',
+    routing_key='microphone.new_sensor.{}'.format(device_names[0]),
+    body={'address': zmq_server_addr_1, 'file_type': 'audio'}
+)
+if len(device_names) > 1:
+    mq.publish(
+        exchange='sensors',
+        routing_key='microphone.new_sensor.{}'.format(device_names[1]),
+        body={'address': zmq_server_addr_2, 'file_type': 'audio'}
+    )
 
-    def run(self):
-        while not self.stopped.wait(5):
-            mq.publish(
-                exchange='sensors',
-                routing_key='microphone.new_sensor.A',
-                body={'address': self.zmq_server_addr, 'file_type': 'audio'}
-            )
+session_name = datetime.datetime.now().isoformat().replace('.', '_').replace(':', '_') + '.'.join(device_names)
 
-thread = MyThread(mq, zmq_server_addr)
-thread.daemon = True
-thread.start()
-
-
+# Let's be on the safe side and recording this to the computer...
+waveFile = wave.open('{}.wav'.format(session_name), 'wb')
+waveFile.setnchannels(CHANNELS)
+waveFile.setsampwidth(p.get_sample_size(FORMAT))
+waveFile.setframerate(RATE)
 
 def callback(in_data, frame_count, time_info, status):
+    result = np.fromstring(in_data, dtype=np.uint16)
+    result = np.reshape(result, (frame_count, 2))
     the_time = mq.get_shifted_time()
-    zmq_socket.send(msgpack.packb((in_data, the_time)))
+    zmq_socket_1.send(msgpack.packb((result[:, 0].tobytes(), the_time)))
+    if len(device_names) > 1:
+        zmq_socket_2.send(msgpack.packb((result[:, 1].tobytes(), the_time)))
+    waveFile.writeframes(in_data)
     return None, pyaudio.paContinue
 
 
@@ -59,9 +77,13 @@ stream = p.open(
     stream_callback=callback
 )
 try:
-    input('[*] Serving at {}. To exit press enter'.format(zmq_server_addr))
+    input('[*] Serving at {}. To exit press enter'.format(','.join(device_names)))
 finally:
+    waveFile.close()
     stream.stop_stream()
     stream.close()
-    zmq_socket.send(b'CLOSE')
-    zmq_socket.close()
+    zmq_socket_1.send(b'CLOSE')
+    zmq_socket_1.close()
+    if len(device_names) > 1:
+        zmq_socket_2.send(b'CLOSE')
+        zmq_socket_2.close()
