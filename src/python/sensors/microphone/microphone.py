@@ -1,5 +1,5 @@
 import pyaudio
-import sys
+import sys,os
 import time
 import msgpack
 sys.path.append('../..')
@@ -10,22 +10,35 @@ import sys
 import datetime
 from threading import Thread, Event
 import wave
+import yaml
+
+# Settings
+SETTINGS_FILE = '../../settings.yaml'
+settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
+
+session_name = '{}.{}.{}'.format(settings['participants']['left']['name'].lower(),
+                                    settings['participants']['right']['name'].lower(),
+                                    settings['participants']['condition'])
+
+
+log_path = os.path.join(settings['logging']['log_path'], session_name)
+
+if not os.path.isdir(log_path):
+    os.makedirs(log_path)
+
+print(log_path)
 
 if len(sys.argv) < 2 or len(sys.argv) > 3:
-    exit('Please provide one or two micrphones')
-if len(sys.argv) >= 2:
+    exit('Please provide one microphone and the participant position')
+else:
     device_indexes = [int(sys.argv[1])]
+    position = sys.argv[2]
     zmq_socket_1, zmq_server_addr_1 = create_zmq_server()
-if len(sys.argv) == 3:
-    device_indexes.index(int(sys.argv[2]))
-    zmq_socket_2, zmq_server_addr_2 = create_zmq_server(s)
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
-RATE = 48000
+RATE = 16000
 CHUNK = 1440
-
-
 
 mq = MessageQueue('microphone-sensor')
 p = pyaudio.PyAudio()
@@ -42,17 +55,9 @@ mq.publish(
     routing_key='microphone.new_sensor.{}'.format(device_names[0]),
     body={'address': zmq_server_addr_1, 'file_type': 'audio'}
 )
-if len(device_names) > 1:
-    mq.publish(
-        exchange='sensors',
-        routing_key='microphone.new_sensor.{}'.format(device_names[1]),
-        body={'address': zmq_server_addr_2, 'file_type': 'audio'}
-    )
-
-session_name = datetime.datetime.now().isoformat().replace('.', '_').replace(':', '_') + '.'.join(device_names)
 
 # Let's be on the safe side and recording this to the computer...
-waveFile = wave.open('{}.wav'.format(session_name), 'wb')
+waveFile = wave.open(os.path.join(log_path,'{}.wav'.format(settings['participants'][position]['name'].lower())), 'wb')
 waveFile.setnchannels(CHANNELS)
 waveFile.setsampwidth(p.get_sample_size(FORMAT))
 waveFile.setframerate(RATE)
@@ -62,8 +67,6 @@ def callback(in_data, frame_count, time_info, status):
     result = np.reshape(result, (frame_count, 2))
     the_time = mq.get_shifted_time()
     zmq_socket_1.send(msgpack.packb((result[:, 0].tobytes(), the_time)))
-    if len(device_names) > 1:
-        zmq_socket_2.send(msgpack.packb((result[:, 1].tobytes(), the_time)))
     waveFile.writeframes(in_data)
     return None, pyaudio.paContinue
 
@@ -84,6 +87,3 @@ finally:
     stream.close()
     zmq_socket_1.send(b'CLOSE')
     zmq_socket_1.close()
-    if len(device_names) > 1:
-        zmq_socket_2.send(b'CLOSE')
-        zmq_socket_2.close()
