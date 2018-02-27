@@ -24,15 +24,18 @@ else:
 SETTINGS_FILE = os.path.abspath(
     os.path.join(os.path.abspath(__file__), os.pardir, os.pardir, 'settings.yaml')
 )
+
 settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
 
-session_name = datetime.datetime.now().isoformat().replace('.', '_').replace(':', '_')
+session_name = '{}.{}.{}'.format(settings['participants']['left']['name'].lower(),
+                                    settings['participants']['right']['name'].lower(),
+                                    settings['participants']['condition'])
 
-log_path = os.path.join(settings['logging']['sensor_path'], session_name)
+log_path = os.path.join(settings['logging']['log_path'], session_name)
 
+if not os.path.isdir(log_path):
+    os.makedirs(log_path)
 
-
-os.mkdir(log_path)
 shutil.copy(os.path.join('..', 'settings.yaml'), os.path.join(log_path, 'settings.yaml'))
 global_runner = True
 running = {}
