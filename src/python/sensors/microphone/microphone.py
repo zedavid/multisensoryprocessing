@@ -49,6 +49,8 @@ for i in range(p.get_device_count()):
     if i in device_indexes:
         device_names.append(device['name'])
 
+if len(device_names) < 1:
+    exit('No microphone was detected')
 
 mq.publish(
     exchange='sensors',
