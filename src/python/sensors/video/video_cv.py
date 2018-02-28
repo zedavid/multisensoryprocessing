@@ -39,8 +39,24 @@ fourcc = cv2.VideoWriter_fourcc(*'MP4V')
 camera = cv2.VideoCapture(camera_id)
 width = camera.get(cv2.CAP_PROP_FRAME_WIDTH)   # float
 height = camera.get(cv2.CAP_PROP_FRAME_HEIGHT) # float
+fps = camera.get(cv2.CAP_PROP_FPS)
 
-print(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['name'])))
+if width != 640.0:
+    width = 640.0
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH,width)
+
+
+if height != 480.0:
+    height = 480.0
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT,height)
+
+if fps != 30.0:
+    fps = 30.0
+    camera.set(cv2.CAP_PROP_FPS,fps)
+
+print(width,height,fps)
+
+print(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['name'].lower())))
 
 out = cv2.VideoWriter(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['name'].lower())), fourcc, 30.0, (int(width), int(height)))
 
@@ -48,7 +64,7 @@ out = cv2.VideoWriter(os.path.join(log_path,'{}.mp4'.format(settings['participan
 mq = MessageQueue('video-webcam-sensor')
 mq.publish(
     exchange='sensors',
-    routing_key='video.new_sensor.{}'.format(settings['participants'][position]['name']),
+    routing_key='video.new_sensor.{}'.format(settings['participants'][position]['name'].lower()),
     body={
         'address': zmq_server_addr,
         'file_type': 'cv-video',
@@ -56,7 +72,7 @@ mq.publish(
             'width': width / 2,
             'height': height / 2,
             'channels': 3,
-            'fps': 30,
+            'fps': fps,
         }
     }
 )
