@@ -45,7 +45,7 @@ def callback(ch, method, properties, body):
         time_stamp = datetime.datetime.fromtimestamp(float(ts['departed'])).strftime('%Y-%m-%d %H:%M:%S')
     path = os.path.join(log_path, 'events.log')
     with open(path, 'a') as f:
-        f.write('{}:\t{}\t{}\n{}\n'.format(time_stamp,method.exchange,method.routing_key,json.dumps(body_dict,ensure_ascii=False,indent=2)))
+        f.write('{}:\t{}\t{}\n{}\n'.format(time_stamp,method.exchange,method.routing_key,json.dumps(body_dict,ensure_ascii=False)))
         #f.write(msgpack.packb((method.exchange, method.routing_key, body)))
     print(method.exchange, method.routing_key, body)
     print("-------------------------------------------------")
