@@ -81,7 +81,7 @@ try:
     while True:
         _, frame = camera.read()
         out.write(frame)
-        zmq_socket.send(msgpack.packb((scipy.ndimage.zoom(frame, (0.5, 0.5, 1), order=0).flatten().tobytes(), time.time())))
+        zmq_socket.send(msgpack.packb((scipy.ndimage.zoom(frame, (1, 1, 1), order=0).flatten().tobytes(), time.time())))
 
 except KeyboardInterrupt:
     mq.disconnect('video.disconnected_sensor.{}'.format(settings['participants'][position]['id']))
