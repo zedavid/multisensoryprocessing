@@ -17,8 +17,8 @@ import argparse
 SETTINGS_FILE = '../../settings.yaml'
 settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
 
-session_name = '{}.{}.{}'.format(settings['participants']['left']['name'].lower(),
-                                    settings['participants']['right']['name'].lower(),
+session_name = '{}.{}.{}'.format(settings['participants']['left']['id'].lower(),
+                                    settings['participants']['right']['id'].lower(),
                                     settings['participants']['condition'])
 
 
