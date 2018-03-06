@@ -18,8 +18,8 @@ import yaml
 SETTINGS_FILE = '../../settings.yaml'
 settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
 
-session_name = '{}.{}.{}'.format(settings['participants']['left']['name'].lower(),
-                                    settings['participants']['right']['name'].lower(),
+session_name = '{}.{}.{}'.format(settings['participants']['left']['id'].lower(),
+                                    settings['participants']['right']['id'].lower(),
                                     settings['participants']['condition'])
 
 
@@ -56,15 +56,15 @@ if fps != 30.0:
 
 print(width,height,fps)
 
-print(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['name'].lower())))
+print(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['id'].lower())))
 
-out = cv2.VideoWriter(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['name'].lower())), fourcc, 30.0, (int(width), int(height)))
+out = cv2.VideoWriter(os.path.join(log_path,'{}.mp4'.format(settings['participants'][position]['id'].lower())), fourcc, 30.0, (int(width), int(height)))
 
 
 mq = MessageQueue('video-webcam-sensor')
 mq.publish(
     exchange='sensors',
-    routing_key='video.new_sensor.{}'.format(settings['participants'][position]['name'].lower()),
+    routing_key='video.new_sensor.{}'.format(settings['participants'][position]['id'].lower()),
     body={
         'address': zmq_server_addr,
         'file_type': 'cv-video',
@@ -84,6 +84,6 @@ try:
         zmq_socket.send(msgpack.packb((scipy.ndimage.zoom(frame, (0.5, 0.5, 1), order=0).flatten().tobytes(), time.time())))
 
 except KeyboardInterrupt:
-    mq.disconnect('video.disconnected_sensor.{}'.format(settings['participants'][position]['name']))
+    mq.disconnect('video.disconnected_sensor.{}'.format(settings['participants'][position]['id']))
     zmq_socket.send(b'CLOSE')
     zmq_socket.close()
