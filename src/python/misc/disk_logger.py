@@ -27,8 +27,8 @@ SETTINGS_FILE = os.path.abspath(
 
 settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
 
-session_name = '{}.{}.{}'.format(settings['participants']['left']['name'].lower(),
-                                    settings['participants']['right']['name'].lower(),
+session_name = '{}.{}.{}'.format(settings['participants']['left']['id'].lower(),
+                                    settings['participants']['right']['id'].lower(),
                                     settings['participants']['condition'])
 
 log_path = os.path.join(settings['logging']['log_path'], session_name)
