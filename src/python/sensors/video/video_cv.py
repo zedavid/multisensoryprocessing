@@ -41,13 +41,13 @@ width = camera.get(cv2.CAP_PROP_FRAME_WIDTH)   # float
 height = camera.get(cv2.CAP_PROP_FRAME_HEIGHT) # float
 fps = camera.get(cv2.CAP_PROP_FPS)
 
-if width != 320.0:
-    width = 320.0
+if width != 640.0:
+    width = 640.0
     camera.set(cv2.CAP_PROP_FRAME_WIDTH,width)
 
 
-if height != 240.0:
-    height = 240.0
+if height != 480.0:
+    height = 480.0
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT,height)
 
 if fps != 30.0:
@@ -81,7 +81,7 @@ try:
     while True:
         _, frame = camera.read()
         out.write(frame)
-        zmq_socket.send(msgpack.packb((scipy.ndimage.zoom(frame, (1, 1, 1), order=0).flatten().tobytes(), time.time())))
+        zmq_socket.send(msgpack.packb((scipy.ndimage.zoom(frame, (0.5, 0.5, 1), order=0).flatten().tobytes(), time.time())))
 
 except KeyboardInterrupt:
     mq.disconnect('video.disconnected_sensor.{}'.format(settings['participants'][position]['id']))
