@@ -1,18 +1,20 @@
 participants:
 
   left:
-    name: Oskar
-    country: Peru
-    language: spanska
+    name: Samira
+    country: Iran
+    language: persiska
+    id: SC50
     position:
       x: 0.7
       y: 0.0
       z: 2.0
 
   right:
-    name: Joan
-    country: Brasilien
-    language: portugisiska
+    name: Halima
+    country: Somalia
+    language: somaliska
+    id: SC51
     position:
       x: -0.7
       y: 0.0
