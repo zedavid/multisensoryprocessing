@@ -39,6 +39,8 @@ def load_video_raw_data(root_dir, filename):
 def load_video_data(filename):
     cap = cv2.VideoCapture(filename)
 
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    print(fps)
     try:
         while(cap.isOpened):
             ret, frame = cap.read()
