@@ -87,7 +87,7 @@ def load_audio_data(filename):
     # read data
     data = f.readframes(chunk)
 
-    try:
+    try:s
         # play stream
         while data:
             stream.write(data)
