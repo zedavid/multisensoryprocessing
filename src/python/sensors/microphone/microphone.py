@@ -1,28 +1,30 @@
 import pyaudio
-import sys,os
+import sys
 import time
 import msgpack
 sys.path.append('../..')
 import numpy as np
 import re
 from shared import create_zmq_server, MessageQueue
-import sys
-import datetime
-from threading import Thread, Event
+import sys,os,argparse
 import wave
+import datetime
+from farmi import FarmiUnit, farmi
 import yaml
-import argparse
+
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 16000
+CHUNK = 2000
 
 # Settings
 SETTINGS_FILE = '../../settings.yaml'
 settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
 
-session_name = '{}.{}.{}'.format(settings['participants']['left']['id'].lower(),
-                                    settings['participants']['right']['id'].lower(),
-                                    settings['participants']['condition'])
+FARMI_DIRECTORY_SERVICE_IP = '127.0.0.1'
+pub = FarmiUnit('microphone-sensor',local_save=True,directory_service_ip=FARMI_DIRECTORY_SERVICE_IP)
 
-
-log_path = os.path.join(settings['logging']['log_path'], session_name)
+log_path = os.path.join(settings['logging']['log_path'], settings['speaker']['id'],time.strftime("%Y_%m_%d"))
 
 if not os.path.isdir(log_path):
     os.makedirs(log_path)
@@ -31,7 +33,6 @@ parser = argparse.ArgumentParser(description='Collects data from microphones')
 parser.add_argument('--device', '-d', type=int,help='device used to capture',required=True)
 parser.add_argument('--channels','-c',type=int,nargs='+',help='channels that are going to be saved')
 parser.add_argument('--num_channels','-n',type=int,help='number of channels to be recorded',default=2)
-
 args = parser.parse_args()
 
 
@@ -39,19 +40,13 @@ device_indexes = [args.device]
 if len(args.channels) > 2:
     exit('provide only two channels')
 
-zmq_socket_1, zmq_server_addr_1 = create_zmq_server()
-zmq_socket_2, zmq_server_addr_2 = create_zmq_server()
-
 FORMAT = pyaudio.paInt16
 CHANNELS = args.num_channels
 RATE = 16000
-CHUNK = 1440
+CHUNK = int(RATE/10)
 
-for ch in args.channels:
-    if ch > CHANNELS:
-        exit('device does not have channel {}'.format(ch))
+zmq_socket, zmq_server_addr = create_zmq_server()
 
-mq = MessageQueue('microphone-sensor')
 p = pyaudio.PyAudio()
 device_names = []
 for i in range(p.get_device_count()):
@@ -63,40 +58,26 @@ for i in range(p.get_device_count()):
 if len(device_names) < 1:
     exit('No microphone was detected')
 
-mq.publish(
-    exchange='sensors',
-    routing_key='microphone.new_sensor.left',
-    body={'address': zmq_server_addr_1, 'file_type': 'audio'}
-)
 
-mq.publish(
-    exchange='sensors',
-    routing_key='microphone.new_sensor.right',
-    body={'address': zmq_server_addr_2, 'file_type': 'audio'}
-)
+session_name = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '_' + re.sub('\s+','_','_'.join(device_names))
+audio_file_name = os.path.join(log_path,'{}.wav'.format(session_name))
+
+pub.send(({'address': zmq_server_addr, 'file_type': 'audio', 'file_name':audio_file_name},'microphone.{}'.format(settings['speaker']['id'])))
 
 # Let's be on the safe side and recording this to the computer...
-waveFile = wave.open(os.path.join(log_path,'two_channels.wav'), 'wb')
+waveFile = wave.open(audio_file_name, 'wb')
 waveFile.setnchannels(CHANNELS)
 waveFile.setsampwidth(p.get_sample_size(FORMAT))
 waveFile.setframerate(RATE)
 
-#waveFile2 = wave.open(os.path.join(log_path,'{}.wav'.format(settings['participants']['left']['name'].lower())), 'wb')
-#waveFile2.setnchannels(CHANNELS)
-#waveFile2.setsampwidth(p.get_sample_size(FORMAT))
-#waveFile2.setframerate(RATE)
-
-
 def callback(in_data, frame_count, time_info, status):
     result = np.fromstring(in_data, dtype=np.uint16)
     result = np.reshape(result, (frame_count, CHANNELS))
-    the_time = mq.get_shifted_time()
-    # assuming the channels that we want to record
-    zmq_socket_1.send(msgpack.packb((result[:, args.channels[0]].tobytes(), the_time)))
-    zmq_socket_2.send(msgpack.packb((result[:, args.channels[1]].tobytes(), the_time)))
+#    the_time = mq.get_shifted_time()
+    zmq_socket.send(msgpack.packb((result[:, args.channels[0]].tobytes(),time.time())))
+    #zmq_socket.send(result[:, args.channels[0]].tobytes())
     waveFile.writeframes(in_data)
     return None, pyaudio.paContinue
-
 
 
 stream = p.open(
@@ -109,12 +90,10 @@ stream = p.open(
     stream_callback=callback
 )
 try:
-    input('[*] Serving at {}. To exit press enter'.format(','.join(device_names)))
+    input('[*] Serving at {}. To exit press enter'.format(zmq_server_addr,))
 finally:
     waveFile.close()
     stream.stop_stream()
     stream.close()
-    zmq_socket_1.send(b'CLOSE')
-    zmq_socket_1.close()
-    zmq_socket_2.send(b'CLOSE')
-    zmq_socket_2.close()
+    zmq_socket.send(b'CLOSE')
+    zmq_socket.close()
