@@ -20,6 +20,18 @@ from farmi import FarmiUnit,farmi
 SETTINGS_FILE = '../../settings.yaml'
 settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
 
+mission_name = settings['mission']['file'].split(os.sep)[-1].split('.')[0]
+session_name = '{}.{}'.format(mission_name, settings['speaker']['id'])
+
+log_path = os.path.join(settings['logging']['log_path'], session_name)
+
+if not os.path.isdir(log_path):
+    os.makedirs(log_path)
+else:
+    print('{} already exists, please change id'.format(log_path))
+    sys.exit()
+
+
 DEBUG = False
 WATSON_CRED_DIR = '/Users/jdlopes/ibm_cloud'
 with open(os.path.join(WATSON_CRED_DIR,'watson_credentials.json')) as f:
@@ -45,7 +57,8 @@ class WatsonCallback(RecognizeCallback):
         'timestamps': True,
         'continuous': True,
         'interim_results': True,
-        'inactivity_timeout ': -1
+        'inactivity_timeout ': -1,
+        'speaker_labels': True
     }
 
     def __init__(self,mq_address,api_url,token,on_message_callback):
@@ -138,6 +151,8 @@ class WatsonCallback(RecognizeCallback):
         if msg.get('error'):
             print('>> {}'.format(msg))
 
+        print(json.dumps(msg,indent=2))
+
         if msg.get('results'):
             data = {
                 'time_start_asr': self.timer,
@@ -165,7 +180,7 @@ def create_regognition_method_str(api_base_url):
 recognition_method_url = create_regognition_method_str(credentials['url'])
 
 FARMI_DIRECTORY_SERVICE_IP = '127.0.0.1'
-pub = FarmiUnit('pre-processor',local_save=True,directory_service_ip=FARMI_DIRECTORY_SERVICE_IP)
+pub = FarmiUnit('asr',local_save=log_path,directory_service_ip=FARMI_DIRECTORY_SERVICE_IP)
 
 
 @farmi(subscribe='microphone-sensor',directory_service_ip=settings['FARMI_DIRECTORY_SERVICE_IP'])
@@ -174,6 +189,8 @@ def audio_handler(subtopic, time_given, data):
     audio_buffer_address = data[0]['address']
     routing_key = data[1]
     participant = routing_key.rsplit('.', 1)[1]
+
+    print(audio_buffer_address)
 
     def on_message(data):
         if DEBUG: print(data)
