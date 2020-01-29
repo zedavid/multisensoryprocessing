@@ -3,18 +3,21 @@ import json
 import msgpack
 import zmq
 from threading import Thread
+from farmi import Subscriber, Publisher
 from watson_developer_cloud import SpeechToTextV1, AuthorizationV1
 from watson_developer_cloud.websocket import RecognizeCallback, AudioSource
 import pyaudio
 import sys,os,yaml
 import urllib.parse
+
+sys.path.append('../..')
+from orca_utils import utils
+
 try:
     from Queue import Queue, Full
 except ImportError:
     from queue import Queue, Full
 
-sys.path.append('../..')
-from farmi import FarmiUnit,farmi
 
 
 # Settings
@@ -41,8 +44,7 @@ if not credentials:
     exit('no credentials')
 
 # setting message queue system
-FARMI_DIRECTORY_SERVICE_IP = '127.0.0.1'
-pub = FarmiUnit('asr',local_save=log_path,directory_service_ip=FARMI_DIRECTORY_SERVICE_IP)
+asr_pub = Publisher('asr',local_save=log_path,directory_service_address='tcp://{}:5555'.format(settings['FARMI_DIRECTORY_SERVICE_IP']))
 
 #api_base_url = credentials['url']
 #authorization = AuthorizationV1(username=credentials['username'], password=credentials['password'])
@@ -58,6 +60,7 @@ class WatsonCallback(RecognizeCallback):
         pass
 
     def on_connected(self):
+        asr_pub.send(({'text': ''},'action.restart'))
         print('Connection was successful')
 
     def on_error(self,error):
@@ -77,11 +80,20 @@ class WatsonCallback(RecognizeCallback):
         if 'results' in data:
             for result in data['results']:
                 routing_key = 'asr.data' if result['final'] else 'asr.incremental_data'
-                pub.send((json.dumps(data),'{}.mic'.format(routing_key)))
+                trans, final = self._parse_speech_data(data)
+                if DEBUG:
+                    utils.print_dict({'transcript': trans, 'final': final})
+                asr_pub.send((json.dumps({'transcript': trans, 'final': final}),'{}.mic'.format(routing_key)))
         if 'speaker_labels' in data:
             for result in data['speaker_labels']:
                 routing_key = 'asr.speaker_labels' if result['final'] else 'asr.incremental_speaker_labels'
-                pub.send((json.dumps(data), '{}.mic'.format(routing_key)))
+                asr_pub.send((json.dumps(data), '{}.mic'.format(routing_key)))
+
+    def _parse_speech_data(self, data):
+
+        one_best = data['results'][0]
+        return one_best['alternatives'][0]['transcript'],one_best['final']
+
 
     def on_close(self):
         print('Connection closed')
@@ -90,23 +102,18 @@ class WatsonCallback(RecognizeCallback):
 def recognize_using_weboscket(audio_source):
 
     mycallback = WatsonCallback()
-    print(audio_source)
     speech_to_text.recognize_using_websocket(audio=audio_source,
                                              content_type='audio/l16; rate=16000',
                                          recognize_callback=mycallback,
                                          interim_results=True,
                                          word_confidence=True,
                                          timestamps=True,
-                                         speaker_labels=True)
+                                         speaker_labels=True,
+                                         inactivity_timeout=settings['asr']['inactivity_timeout'])
 speech_to_text = SpeechToTextV1(
     iam_apikey=credentials['apikey'],
     url=credentials['url']
 )
-
-#def create_regognition_method_str(api_base_url):
-#	parsed_url = urllib.parse.urlparse(api_base_url)
-#	return urllib.parse.urlunparse(("wss", parsed_url.netloc, parsed_url.path + "/v1/recognize", parsed_url.params, parsed_url.query, parsed_url.fragment, ))
-#recognition_method_url = create_regognition_method_str(credentials['url'])
 
 def audio_callback(audio_address,audio_queue):
 
@@ -134,7 +141,6 @@ def open_recognizer(audio_config):
     audio_thread = Thread(target=audio_callback, args=(audio_config['address'],q))
     audio_thread.start()
 
-
     try:
         rec_thread = Thread(target=recognize_using_weboscket, args=(audio_source,))
         rec_thread.start()
@@ -144,11 +150,13 @@ def open_recognizer(audio_config):
         audio_source.completed_recording()
         return
 
-
-@farmi(subscribe='microphone-sensor',directory_service_ip=settings['FARMI_DIRECTORY_SERVICE_IP'])
 def audio_handler(subtopic, time_given, data):
 
     open_recognizer(data[0])
 
-print('[*] Waiting for messages. To exit press CTRL+C')
-audio_handler()
+
+audio_stream_sub = Subscriber(directory_service_address='tcp://{}:5555'.format(settings['FARMI_DIRECTORY_SERVICE_IP']))
+audio_stream_sub.subscribe_to('microphone-sensor', audio_handler)
+audio_stream_sub.listen()
+
+
