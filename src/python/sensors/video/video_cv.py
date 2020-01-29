@@ -1,25 +1,22 @@
-import zmq
-import pika
 import time
 import msgpack
 import cv2
-import sys,os
-import zmq
-import numpy as np
-import subprocess
+import sys,os,argparse
 import scipy.ndimage
 import datetime
 sys.path.append('../..')
-from farmi import FarmiUnit, farmi
+from farmi import Publisher
 from shared import create_zmq_server, MessageQueue
 zmq_socket, zmq_server_addr = create_zmq_server()
 import yaml
 
-# Settings
-SETTINGS_FILE = '../../settings.yaml'
-settings = yaml.safe_load(open(SETTINGS_FILE, 'r').read())
+parser = argparse.ArgumentParser(description='Video recording script')
+parser.add_argument('--setting_file','-s',type=str,help='settings file use for the experiment',required=True)
+parser.add_argument('--camera_id','-c',type=int,help='camera identifier',required=True)
 
-FARMI_DIRECTORY_SERVICE_IP = '127.0.0.1'
+args = parser.parse_args()
+
+settings = yaml.safe_load(open(args.setting_file, 'r').read())
 
 mission_name = settings['mission']['file'].split(os.sep)[-1].split('.')[0]
 session_name = '{}.{}.{}'.format(mission_name, settings['speaker']['id'],settings['condition'])
@@ -29,21 +26,16 @@ log_path = os.path.join(settings['logging']['log_path'], session_name)
 if not os.path.isdir(log_path):
     os.makedirs(log_path)
 
-pub = FarmiUnit('video-sensor',local_save=log_path,directory_service_ip=FARMI_DIRECTORY_SERVICE_IP)
+pub = Publisher('video-sensor',local_save=log_path,directory_service_address=f"tcp://{settings['FARMI_DIRECTORY_SERVICE_IP']}:5555")
 
 log_path = os.path.join(settings['logging']['log_path'], session_name)
 
 if not os.path.isdir(log_path):
     os.makedirs(log_path)
 
-if len(sys.argv) != 2:
-    exit('error. python video_cv.py [camera]')
-
-camera_id = int(sys.argv[1])
-
 fourcc = cv2.VideoWriter_fourcc(*'MP4V')
 
-camera = cv2.VideoCapture(camera_id)
+camera = cv2.VideoCapture(args.camera_id)
 width = camera.get(cv2.CAP_PROP_FRAME_WIDTH)   # float
 height = camera.get(cv2.CAP_PROP_FRAME_HEIGHT) # float
 fps = camera.get(cv2.CAP_PROP_FPS)
@@ -61,7 +53,7 @@ if fps != 30.0:
     fps = 30.0
     camera.set(cv2.CAP_PROP_FPS,fps)
 
-session_name = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '_' + str(camera_id)
+session_name = datetime.datetime.now().strftime("%Y%m%d_%H%M%S") + '_' + str(args.camera_id)
 
 non_sync_video_filename = os.path.join(log_path,'{}.mp4'.format(session_name))
 
