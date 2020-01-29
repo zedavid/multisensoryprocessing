@@ -1,0 +1,70 @@
+speaker:
+  id: 'orca_dbg_gzb_connection'
+
+condition: 'user_plan'
+
+mission:
+  #file: '/Users/jdlopes/orca_ds/missions/fire_xmas_tree_west_tower.yaml'
+  #file: '/Users/jdlopes/orca_ds/missions/fire_xmas_tree_north_tower.yaml'
+  #file: '/Users/jdlopes/orca_ds/missions/fire_processing_unit_east_tower.yaml'
+  file: '/Users/jdlopes/orca_ds/missions/fire_processing_unit_south_tower.yaml'
+
+
+#FARMI_DIRECTORY_SERVICE_IP: '127.0.0.1'
+FARMI_DIRECTORY_SERVICE_IP: '192.168.1.102'
+
+furhat_agent_name: 'agent'
+furhat_pre_recorded: '/path'
+
+asr:
+  inactivity_timeout: 90
+
+logging:
+  log_path: '/Users/jdlopes/ORCA/logs'
+  log_frequency: 3
+
+messaging:
+  broker_host: "localhost"
+  broker_port: 5672
+  broker_user: "guest"
+  broker_pass: "guest"
+
+  # time server host
+  time_server_host: "localhost"
+
+  # connection server
+  connection_server_host: "tcp://CONNECTION SERVER IP ADDRESS:45322"
+
+  # sensor hosts
+  mocap_host: "MOCAP IP ADDRESS"
+
+  # exchanges
+  artificial_agent: "artificial-agent"
+  sensors: "sensors"
+  pre_processing: "pre-processor"
+  environment: "environment"
+  wizard: "wizard"
+  fatima: "fatima"
+  dialogue: "agent"
+
+  # sensors
+  microphone: "microphone"
+  camera: "camera"
+  kinect: "kinect"
+  mocap: "mocap"
+  tobii: "tobii"
+
+  # new sensor
+  new_sensor_mocap: "mocap.new_sensor.all"
+  new_sensor_tobii: "tobii.new_sensor"
+
+  # pre_processing
+  mocap_processing: "mocap.processing"
+  tobii_processing: "tobii.processing"
+  openface: "openface"
+
+  #processors
+  mocaptobii_processing: "mocaptobii.processing"
+  position_data: "position.data"
+  asr_watson: "asr.data"
+  dialogue_acts : "dialogue_act.data"
