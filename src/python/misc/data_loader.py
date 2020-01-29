@@ -7,6 +7,8 @@ import argparse,os
 import json
 
 #default audio configuration in the CORALL recordings
+import sys
+
 p = pyaudio.PyAudio()
 FORMAT = pyaudio.paInt16
 CHANNELS = 2
@@ -64,11 +66,26 @@ def load_audio_raw_data(root_dir,filename):
     try:
         with open(os.path.join(root_dir,filename),'rb') as f:
             unpacker = msgpack.Unpacker(f)
-            for value, timestamp in unpacker:
-                stream.write(value)
+            for chunk in unpacker:
+                print(chunk)
+                stream.write(chunk[2])
     except KeyboardInterrupt:
         stream.close()
         return
+
+
+def load_farmi_data(filename):
+
+    with open(filename,'rb') as f:
+        unpacker = msgpack.Unpacker(f)
+        for line in unpacker:
+            print(len(line))
+            #try:
+            message = {'sender': str(line[0]), 'topic': str(line[1]), 'timestamp': float(line[2]), 'content': str(line[3])}
+            print(json.dumps(message, indent=2))
+#            except:
+#                print(line)
+#                sys.exit()
 
 def load_audio_data(filename):
 
@@ -87,7 +104,7 @@ def load_audio_data(filename):
     # read data
     data = f.readframes(chunk)
 
-    try:s
+    try:
         # play stream
         while data:
             stream.write(data)
@@ -111,10 +128,17 @@ for root,dir,files in os.walk(args.folder):
         print(os.path.join(root,file))
         if file.endswith('cv-video'):
             load_video_raw_data(root,file)
-        if file.endswith('mp4'):
+        elif file.endswith('mp4'):
             load_video_data(os.path.join(root,file))
-        if file.endswith('data.audio'):
+        elif file.endswith('data.audio'):
             load_audio_raw_data(root,file)
-        if file.endswith('wav'):
+        elif file.endswith('wav'):
+            continue
             load_audio_data(os.path.join(root,file))
+        elif file.endswith('.farmi') or file.endswith('-wizard.farmi'):
+            load_farmi_data(os.path.join(root,file))
+        else:
+            print('File extension not supported for file {}'.format(os.path.join(root,file)))
+            continue
+
 
