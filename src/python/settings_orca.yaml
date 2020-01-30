@@ -1,7 +1,9 @@
 speaker:
-  id: 'orca_dbg_gzb_connection'
+  id: 'orca_dbg_data'
 
-condition: 'user_plan'
+interaction_style: 'user_plan'
+
+condition: 'smart_speaker'
 
 mission:
   #file: '/Users/jdlopes/orca_ds/missions/fire_xmas_tree_west_tower.yaml'
